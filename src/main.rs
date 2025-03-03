@@ -12,7 +12,7 @@ use esp32_nimble::{enums::{AuthReq, SecurityIOCap}, utilities::BleUuid, uuid128,
 use esp_idf_svc::sys::{self as _};
 
 
-const DEVICE_NUM:u8 = 1;
+const DEVICE_NUM:u8 = 2;
 #[derive(Copy, Clone,PartialEq)]
 enum AppMode {
     LUX,
@@ -298,7 +298,7 @@ fn ble_thread_function(
             }
         };
         println!("BLE THREAD");
-        FreeRtos::delay_ms(100);
+        FreeRtos::delay_ms(1);
     }
 }
 fn encode_data(status: bool, device_number: u8, white: u16, data: u16) -> u64 {
