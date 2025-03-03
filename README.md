@@ -7,7 +7,7 @@ Im working BLE connect for android, [raspberry pi app](https://github.com/yumzi1
 
 BLE 8byte protocol
 Decode & Encode function
-'''
+```
 1byte 
 1bit: row or lux mod state 1bit 0 or 1
 3bit: DEVICE NUMBER
@@ -15,7 +15,7 @@ Decode & Encode function
 white 2byte
 
 raw or lux data 4byte
-'''
+```
 BLE Send message speed control is ble_thread_function delay ms change
 ## View
 ![Image](https://github.com/user-attachments/assets/051fa6b5-f815-4e7f-b151-e4d53986fd26)
