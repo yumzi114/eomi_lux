@@ -1,10 +1,10 @@
 use std::sync::{Arc, Mutex};
 
 use embedded_graphics::{
-    mono_font::{ascii::{FONT_6X10, FONT_9X15_BOLD}, iso_8859_1::FONT_6X13_BOLD, MonoTextStyleBuilder}, pixelcolor::BinaryColor, prelude::*, primitives::{PrimitiveStyle, Rectangle}, text::{Baseline, Text}
+    mono_font::{ascii::{FONT_9X15_BOLD}, MonoTextStyleBuilder}, pixelcolor::BinaryColor, prelude::*, primitives::{PrimitiveStyle, Rectangle}, text::{Baseline, Text}
 };
-use ssd1306::{mode::BufferedGraphicsMode, prelude::*, I2CDisplayInterface, Ssd1306};
-use esp_idf_hal::{delay::{Delay, FreeRtos}, gpio::{AnyIOPin, Input, InputPin, PinDriver, Pull}, i2c::{I2cConfig, I2cDriver}, prelude::Peripherals};
+use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
+use esp_idf_hal::{delay::{Delay, FreeRtos}, gpio::{Input, PinDriver, Pull}, i2c::{I2cConfig, I2cDriver}, prelude::Peripherals};
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_hal::prelude::*;
 use veml7700::Veml7700;
@@ -38,7 +38,6 @@ fn main() -> anyhow::Result<()>{
     let scl = peripherals.pins.gpio4;
     let mut i2c_driver = I2cDriver::new(peripherals.i2c0, sda, scl, &i2c_conf)?;
     let interface = I2CDisplayInterface::new(i2c_driver);
-    // let mut btn_pin: esp_idf_hal::gpio::AnyInputPin = peripherals.pins.gpio20.downgrade_input();
     let mut btn_pin: PinDriver<esp_idf_hal::gpio::Gpio17, Input>= PinDriver::input(peripherals.pins.gpio17)?;
     btn_pin.set_pull(Pull::Up)?;
     // let button = peripherals.pins.gpio15.into_pull_up_input();
@@ -47,12 +46,7 @@ fn main() -> anyhow::Result<()>{
     let _button_thread = std::thread::Builder::new()
         .stack_size(BUTTON_STACK_SIZE)
         .spawn(move || button_thread_function(btn_pin,mem))
-        .unwrap();
-    // let mut display = Ssd1306::new(
-    //     interface,
-    //     DisplaySize128x64,
-    //     DisplayRotation::Rotate0,
-    // ).into_buffered_graphics_mode();
+        ?;
     let mut display = Ssd1306::new(
         interface,
         DisplaySize128x64,
@@ -133,7 +127,6 @@ fn main() -> anyhow::Result<()>{
                         .unwrap();
                     lux_flag=lux;
                 }
-
             },
             AppMode::RAW=>{
                 Text::with_baseline(format!("RAW : ").as_str(), Point::new(0, 48), text_style, Baseline::Top)
@@ -145,9 +138,6 @@ fn main() -> anyhow::Result<()>{
                         .into_styled(clear_style)
                         .draw(&mut display)
                         .unwrap();
-                    // Text::with_baseline(format!("{:#06x}",raw).as_str(), Point::new(50, 48), text_style, Baseline::Top)
-                    //     .draw(&mut display)
-                    //     .unwrap();
                     Text::with_baseline(format!("{}",raw).as_str(), Point::new(50, 48), text_style, Baseline::Top)
                         .draw(&mut display)
                         .unwrap();
@@ -155,12 +145,8 @@ fn main() -> anyhow::Result<()>{
                 }
             },
         }
-        
-        
-        // println!("white{}, lux {:.2}",white,lux);
         display.flush().unwrap();
         FreeRtos::delay_ms(1);
-        // delay.delay_ms(1);
     }
     Ok(())
 }
@@ -187,6 +173,5 @@ fn button_thread_function(
             flag=0;
         }
         FreeRtos::delay_ms(100);
-        
     }
 }
