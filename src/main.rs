@@ -28,7 +28,10 @@ fn main() -> anyhow::Result<()>{
     let sys_loop = EspSystemEventLoop::take()?;
     let delay: Delay = Default::default();
     esp_idf_svc::log::EspLogger::initialize_default();
+    BLEDevice::init();
+    BLEDevice::set_device_name(format!("[EOMi]-lux{}",DEVICE_NUM).as_str())?;
     let ble_device = BLEDevice::take();
+    
     let mut app_mod = Arc::new(Mutex::new(AppMode::LUX));
     let i2c_conf = I2cConfig::new().baudrate(600.kHz().into());
     //sensor config
@@ -84,7 +87,7 @@ fn main() -> anyhow::Result<()>{
     notifying_characteristic.lock().set_value(b"Initial value.");
     ble_advertising.lock().set_data(
         BLEAdvertisementData::new()
-          .name(format!("[eomi]-lux{}",DEVICE_NUM).as_str())
+          .name(format!("[EOMi]-lux{}",DEVICE_NUM).as_str())
           .add_service_uuid(BleUuid::Uuid16(0xABCD)),
       )?;
     ble_advertising.lock().start()?;
@@ -103,7 +106,7 @@ fn main() -> anyhow::Result<()>{
     let lux_mem_c=lux_mem.clone();
     let raw_mem_c=raw_mem.clone();
     let mem=app_mod.clone();
-    let _button_thread = std::thread::Builder::new()
+    let _ble_thread = std::thread::Builder::new()
         .stack_size(BUTTON_STACK_SIZE)
         .spawn(move || ble_thread_function(
             white_mem_c,
@@ -130,7 +133,7 @@ fn main() -> anyhow::Result<()>{
     let mut raw_flag=0;
     
     loop{
-        Text::with_baseline("[EOMI]LUX", Point::zero(), text_style, Baseline::Top)
+        Text::with_baseline(format!("[EOMi]LUX{}",DEVICE_NUM).as_str(), Point::zero(), text_style, Baseline::Top)
             .draw(&mut display)
             .unwrap();
         display.flush().unwrap();
@@ -254,51 +257,39 @@ fn ble_thread_function(
     app_state:Arc<Mutex<AppMode>>
 ){
     loop{
-        let data = if *app_state.lock().unwrap()==AppMode::RAW {
-            encode_data(
-                true,
-                DEVICE_NUM,
-                *white_mem.lock().unwrap(),
-                *raw_mem.lock().unwrap(),
-            )
-        }else{
-            l_encode_data(
-                false, 
-                DEVICE_NUM, 
-                *white_mem.lock().unwrap(), 
-                *lux_mem.lock().unwrap()
-            )
-        };
-        ble_ctrol
-        .lock()
-        .set_value(&data.to_be_bytes())
-        .notify();
-        let data = if *app_state.lock().unwrap()==AppMode::RAW {
-            encode_data(
-                true,
-                DEVICE_NUM,
-                *white_mem.lock().unwrap(), 
-                *raw_mem.lock().unwrap(),
-            )
-        }else{
-            l_encode_data(false, 
-                DEVICE_NUM, 
-                *white_mem.lock().unwrap(), 
-                *lux_mem.lock().unwrap()
-            )
-        };
-        match (data >> 63) & 1 == 1 {
-            true =>{
+        match  *app_state.lock().unwrap(){
+            AppMode::RAW=>{
+                let data = encode_data(
+                    true,
+                    DEVICE_NUM,
+                    *white_mem.lock().unwrap(),
+                    *raw_mem.lock().unwrap(),
+                );
+                ble_ctrol
+                    .lock()
+                    .set_value(&data.to_be_bytes())
+                    .notify(); 
                 let data = decode_data(data);
-                println!("Decoded: status = {}, device_number = {}, white = {}, raw = {}", data.0, data.1, data.2, data.3);
+                println!("Decoded: status = {}, device_number = {}, white = {}, raw = {}", data.0, data.1, data.2, data.3);       
             },
-            false=>{
+            AppMode::LUX=>{
+                let data = l_encode_data(
+                    true,
+                    DEVICE_NUM,
+                    *white_mem.lock().unwrap(),
+                    *lux_mem.lock().unwrap(),
+                );
+                ble_ctrol
+                    .lock()
+                    .set_value(&data.to_be_bytes())
+                    .notify(); 
                 let data = l_decode_data(data);
                 println!("Decoded: status = {}, device_number = {}, white = {}, lux = {:.2}", data.0, data.1, data.2, data.3);
             }
-        };
-        println!("BLE THREAD");
-        FreeRtos::delay_ms(1);
+        }
+        //us delay
+        // FreeRtos::delay_ms(100);
+        FreeRtos::delay_ms(1_u32.saturating_add(1_000_000 - 1) / 1_000_000);
     }
 }
 fn encode_data(status: bool, device_number: u8, white: u16, data: u16) -> u64 {
@@ -318,14 +309,14 @@ fn l_encode_data(status: bool, device_number: u8, white: u16, data: f32) -> u64 
     let l_encoded: u64 = ((status_bit as u64) << 63) 
         | ((device_bits as u64) << 56)
         | ((white as u64) << 40)
-        | (data as u64);
+        | (data.to_bits() as u64);
     l_encoded
 }
 
 
 fn decode_data(encoded_data: u64) -> (bool, u8, u16, u32) {
     let status = (encoded_data >> 63) & 1 == 1;
-    let device_number = (encoded_data >> 56) & 0x01;
+    let device_number = (encoded_data >> 56) & 0x7F;
     let white = (encoded_data >> 40) & 0xFFFF;
     let data = (encoded_data & 0xFFFFFFFF) as u32;
     
@@ -333,9 +324,9 @@ fn decode_data(encoded_data: u64) -> (bool, u8, u16, u32) {
 }
 fn l_decode_data(encoded_data: u64) -> (bool, u8, u16, f32) {
     let status = (encoded_data >> 63) & 1 == 1;
-    let device_number = (encoded_data >> 56) & 0x01;
+    let device_number = (encoded_data >> 56) & 0x7F;
     let white = (encoded_data >> 40) & 0xFFFF;
-    let data = (encoded_data & 0xFFFFFFFF) as f32;
+    let data = f32::from_bits((encoded_data & 0xFFFFFFFF) as u32);
     
     (status, device_number as u8, white as u16, data)
 }
