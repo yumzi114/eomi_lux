@@ -9,10 +9,10 @@ BLE 8byte protocol
 Decode & Encode function
 
 1byte 
-- row or lux mod state 1bit 0 or 1
-- DEVICE NUMBER<br/>
-white 2byte<br/>
-data 4byte<br/>
+  row or lux mod state 1bit 0 or 1
+  DEVICE NUMBER
+white 2byte
+data 4byte
 
 BLE Send message speed control is ble_thread_function delay ms change
 ## View
