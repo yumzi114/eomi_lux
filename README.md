@@ -5,12 +5,12 @@ This repository i2c config 600kHz setting You can change stable 100kHz setting
 
 Im working BLE connect for android, [raspberry pi app](https://github.com/yumzi114/lighttester)
 
-BLE 8byte protocol
+BLE 8byte protocol<br/>
 Decode & Encode function
 
 1byte 
-  row or lux mod state 1bit 0 or 1
-  DEVICE NUMBER<br/>
+  row or lux mod state 1bit 0 or 1 &
+  DEVICE NUMBER(7bit)<br/>
 white 2byte<br/>
 data 4byte<br/>
 
